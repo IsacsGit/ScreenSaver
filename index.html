@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Premium Cinematic Lava Lamp - Tactile Fluid</title>
+  <style>
+    /* Pure OLED Black Base */
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000000;
+      overflow: hidden;
+      cursor: default;
+      touch-action: none; 
+      user-select: none;
+    }
+
+    /* Cinematic cursor hiding */
+    body.idle {
+      cursor: none;
+    }
+
+    /* Container holding the premium diffuse gray aura */
+    .glow-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      /* Atmospheric light drop-shadow */
+      filter: drop-shadow(0 0 60px rgba(170, 170, 170, 0.45));
+      z-index: 1;
+    }
+
+    /* Canvas strictly fills screen and applies the liquid merge filter */
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      /* The Metaball filter that glues overlapping pixels together */
+      filter: url('#goo'); 
+    }
+    
+    /* Invisible container for the SVG filter */
+    .svg-filter {
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Liquid merging/splitting SVG Filter -->
+  <svg class="svg-filter">
+    <defs>
+      <filter id="goo">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="24" result="blur" />
+        <feColorMatrix in="blur" mode="matrix" values="
+          1 0 0 0 0  
+          0 1 0 0 0  
+          0 0 1 0 0  
+          0 0 0 35 -15" result="goo" />
+        <feBlend in="SourceGraphic" in2="goo" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="glow-container">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    /**
+     * TACTILE ATMOSPHERIC MOLECULAR ENGINE
+     * Features:
+     * 1. 100% Free Roaming (Steer-Away margins, no central clumping).
+     * 2. Polar Wander Steering (Decentralized, non-synchronized paths).
+     * 3. Tactile Mouse/Touch Interaction Field (Gently repels orbs).
+     * 4. Smart Hiding 5-Second Idle State (Turns off mouse physical footprint when hidden).
+     */
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height, minDim;
+    let time = 0; 
+    
+    // Core Steering and Environmental Tuning
+    const STEER_LAZINESS = 0.02;       // How slowly they turn toward their target angle
+    const ATMOSPHERIC_SEP = 0.0012;    // Very gentle spacing force to distribute them across the screen
+    const FUSION_REPULSION = 0.007;    // Soft-body push to slide merged droplets apart
+    const FUSION_RADIUS = 1.05;        // Merge threshold: allows physical contact and merging
+    const DISPERSION_RADIUS = 3.5;     // Separation threshold: keeps them spread out
+
+    // Cursor Interaction Variables
+    let mouseX = 0;
+    let mouseY = 0;
+    let mouseActive = false; // Becomes true when moving, false when hidden
+    let idleTimeout;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      minDim = Math.min(width, height);
+    }
+    window.addEventListener('resize', resize);
+    resize(); 
+
+    // Balanced size distribution
+    const sizeDistribution = [
+      0.14, 0.13,                           
+      0.11, 0.11, 0.10, 0.10,               
+      0.09, 0.09, 0.08, 0.08, 0.07, 0.07,   
+      0.06, 0.06, 0.05, 0.05,               
+      0.04, 0.04, 0.04, 0.04,
+      0.03, 0.03, 0.03, 0.03
+    ];
+
+    // Initialize orbs widely across the entire viewport
+    const orbs = sizeDistribution.map((sizeMultiplier, index) => {
+      // Glacial velocity scaling (0.06 to 0.11 px per frame)
+      const baseSpeed = 0.06 + (Math.random() * 0.05); 
+      const initialAngle = Math.random() * Math.PI * 2;
+
+      return {
+        r: sizeMultiplier,                 
+        mass: Math.pow(sizeMultiplier, 2), 
+        
+        // Spawn scattered across the whole screen
+        x: (Math.random() * 0.8 + 0.1) * width, 
+        y: (Math.random() * 0.8 + 0.1) * height,
+        
+        vx: Math.cos(initialAngle) * baseSpeed, 
+        vy: Math.sin(initialAngle) * baseSpeed,
+        
+        angle: initialAngle,              // Current physical heading
+        targetAngle: initialAngle,        // The angle the orb wants to steer toward
+        speed: baseSpeed,                 // Fixed constant speed
+        seed: Math.random() * 1000        
+      };
+    });
+
+    /**
+     * Resolves the Dual-Zone Molecular Force Field.
+     */
+    function resolveMolecularForces() {
+      for (let i = 0; i < orbs.length; i++) {
+        let orb1 = orbs[i];
+        let forceX = 0;
+        let forceY = 0;
+
+        for (let j = 0; j < orbs.length; j++) {
+          if (i === j) continue;
+          let orb2 = orbs[j];
+
+          const dx = orb1.x - orb2.x;
+          const dy = orb1.y - orb2.y;
+          const distance = Math.hypot(dx, dy);
+
+          // 1. ATMOSPHERIC SEPARATION (Large-range, extremely gentle)
+          const separationLimit = (orb1.r + orb2.r) * minDim * DISPERSION_RADIUS;
+          
+          if (distance < separationLimit && distance > 0.5) {
+            const nx = dx / distance;
+            const ny = dy / distance;
+            
+            const overlapRatio = 1 - (distance / separationLimit);
+            const sepForce = overlapRatio * overlapRatio * ATMOSPHERIC_SEP;
+            
+            forceX += nx * sepForce;
+            forceY += ny * sepForce;
+          }
+
+          // 2. FUSION REPULSION (Close-range, soft-body merge resolution)
+          const fusionLimit = (orb1.r + orb2.r) * minDim * FUSION_RADIUS;
+          if (distance < fusionLimit && distance > 0.5) {
+            const nx = dx / distance;
+            const ny = dy / distance;
+            
+            const overlapRatio = 1 - (distance / fusionLimit);
+            const repForce = overlapRatio * overlapRatio * FUSION_REPULSION;
+            
+            forceX += nx * repForce;
+            forceY += ny * repForce;
+          }
+        }
+
+        // Apply accumulated forces to velocity vectors (divided by mass)
+        orb1.vx += forceX / orb1.mass;
+        orb1.vy += forceY / orb1.mass;
+      }
+    }
+
+    /**
+     * Core Physics & Steering Updates
+     */
+    function updatePhysics() {
+      for (let i = 0; i < orbs.length; i++) {
+        let orb = orbs[i];
+
+        // 1. POLAR STEERING (Autonomous Wander Behavior)
+        if (Math.random() < 0.008) { 
+          orb.targetAngle = Math.random() * Math.PI * 2;
+        }
+
+        // 2. SENSORY BORDER CONTROL (Steer Away From Walls)
+        const margin = orb.r * minDim * 1.5;
+        let nearWall = false;
+
+        if (orb.x < margin) {
+          orb.targetAngle = 0; // Turn Right
+          nearWall = true;
+        } else if (orb.x > width - margin) {
+          orb.targetAngle = Math.PI; // Turn Left
+          nearWall = true;
+        }
+
+        if (orb.y < margin) {
+          orb.targetAngle = Math.PI / 2; // Turn Down
+          nearWall = true;
+        } else if (orb.y > height - margin) {
+          orb.targetAngle = -Math.PI / 2; // Turn Up
+          nearWall = true;
+        }
+
+        let angleDiff = orb.targetAngle - orb.angle;
+        angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+
+        const turnSpeed = nearWall ? 0.08 : STEER_LAZINESS;
+        orb.angle += angleDiff * turnSpeed;
+
+        // 3. CRAIG REYNOLDS' STEERING FORCE
+        const desiredVx = Math.cos(orb.angle) * orb.speed;
+        const desiredVy = Math.sin(orb.angle) * orb.speed;
+
+        orb.vx += (desiredVx - orb.vx) * 0.03;
+        orb.vy += (desiredVy - orb.vy) * 0.03;
+
+        // 4. TACTILE CURSOR INTERACTION
+        // Only repels orbs when the pointer is active (shown).
+        if (mouseActive) {
+          const mDx = orb.x - mouseX;
+          const mDy = orb.y - mouseY;
+          const mDistance = Math.hypot(mDx, mDy);
+          const mouseLimit = minDim * 0.22; // Responsive interaction circle
+
+          if (mDistance < mouseLimit && mDistance > 1) {
+            const mNx = mDx / mDistance;
+            const mNy = mDy / mDistance;
+            
+            const mOverlap = 1 - (mDistance / mouseLimit);
+            // Quadratic gentle push
+            const mForce = mOverlap * mOverlap * 0.035; 
+
+            orb.vx += mNx * mForce;
+            orb.vy += mNy * mForce;
+          }
+        }
+
+        // 5. Update coordinates
+        orb.x += orb.vx;
+        orb.y += orb.vy;
+
+        // 6. HARD RE-CENTER SAFETY (Only triggers during extreme, rapid window resizes)
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const outOfBoundsLimit = Math.max(width, height) * 0.85;
+        if (Math.hypot(centerX - orb.x, centerY - orb.y) > outOfBoundsLimit) {
+          orb.x = centerX + (Math.random() - 0.5) * (minDim * 0.3);
+          orb.y = centerY + (Math.random() - 0.5) * (minDim * 0.3);
+          orb.vx = 0;
+          orb.vy = 0;
+          orb.angle = Math.random() * Math.PI * 2;
+          orb.targetAngle = orb.angle;
+        }
+      }
+
+      // 7. Execute the Dual-Zone Molecular Force Field
+      resolveMolecularForces();
+    }
+
+    /**
+     * Draws an orb with an incredibly slow, subtle wobble.
+     */
+    function drawOrganicBlob(cx, cy, baseRadius, seed) {
+      const points = [];
+      const numPoints = 14; 
+      
+      for(let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * Math.PI * 2;
+        
+        const warp = Math.sin(angle * 2 + time * 0.2 + seed) * (baseRadius * 0.03) +
+                     Math.cos(angle * 3 - time * 0.12 + seed) * (baseRadius * 0.015);
+                     
+        const r = baseRadius + warp;
+        points.push({
+          x: cx + Math.cos(angle) * r,
+          y: cy + Math.sin(angle) * r
+        });
+      }
+
+      ctx.beginPath();
+      const midpoints = [];
+      for(let i = 0; i < points.length; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        midpoints.push({ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 });
+      }
+
+      ctx.moveTo(midpoints[0].x, midpoints[0].y);
+      for(let i = 0; i < points.length; i++) {
+        const nextIdx = (i + 1) % points.length;
+        ctx.quadraticCurveTo(points[nextIdx].x, points[nextIdx].y, midpoints[nextIdx].x, midpoints[nextIdx].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    /**
+     * Main Animation Render Loop
+     */
+    function draw() {
+      updatePhysics();
+
+      // Clear frame safely
+      ctx.clearRect(0, 0, width, height); 
+      ctx.fillStyle = '#FFFFFF'; 
+
+      // Draw all processed physical bodies
+      for (let orb of orbs) {
+        const visualRadius = minDim * orb.r;
+        drawOrganicBlob(orb.x, orb.y, visualRadius, orb.seed);
+      }
+
+      // Wobble speed reduced to match the new velocity pace
+      time += 0.001; 
+      requestAnimationFrame(draw);
+    }
+
+    // Begin render cycle
+    draw();
+
+    /**
+     * --------------------------------------------------------
+     * PREMIUM CINEMATIC CURSOR HIDING & MOUSE POSITION MAPPING
+     * Supports both desktop mouse and tablet/mobile touch drag.
+     * --------------------------------------------------------
+     */
+    function resetIdleTimer() {
+      // Re-enable actual mouse cursor visibility and engagement
+      mouseActive = true;
+      document.body.classList.remove('idle');
+      
+      clearTimeout(idleTimeout);
+      
+      // De-engage and hide the mouse after exactly 5 seconds of absolute stillness
+      idleTimeout = setTimeout(() => {
+        mouseActive = false;
+        document.body.classList.add('idle');
+      }, 5000); 
+    }
+
+    function handlePointerMove(e) {
+      resetIdleTimer();
+      
+      let clientX, clientY;
+      
+      // Handle mobile touch coordinates
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      
+      mouseX = clientX;
+      mouseY = clientY;
+    }
+    
+    // Bind pointer events
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('touchmove', handlePointerMove, { passive: true });
+    window.addEventListener('touchstart', handlePointerMove, { passive: true });
+    window.addEventListener('mousedown', resetIdleTimer);
+    window.addEventListener('keydown', resetIdleTimer);
+    
+    // Initialize
+    resetIdleTimer();
+
+  </script>
+</body>
+</html>
